@@ -4,7 +4,9 @@ from keras.models import Sequential
 from keras.layers import Dense, Dropout, Activation
 from keras.layers import Embedding
 from keras.layers import LSTM
+import random
 
+data_dir = "/home/spica/mnt_device/aqi/dev_data/"
 def process(x):
     if x == '?':
         return 0.0
@@ -20,7 +22,7 @@ length = 16
 data = []
 
 print("Processing target set")
-f = open("Beijing", 'r')
+f = open(data_dir+"Beijing", 'r')
 l = len(f.readlines())
 ls = []
 f.close()
@@ -28,7 +30,7 @@ buff = []
 target_set = []
 
 for line in range(96,14688):
-    f1 = open("Beijing", "r")
+    f1 = open(data_dir+"Beijing", "r")
 #    f2 = open("Tianjin","r")
 #    f3 = open("Huludao","r")
     ls1 = f1.readlines()[line].split("#")
@@ -46,34 +48,38 @@ for line in range(96,14688):
 
 print("Processing trainingset")
 for i in range(14592):
-    f1 = open("Beijing", "r")
-    f2 = open("Tianjin","r")
-    f3 = open("Huludao","r")
+    f1 = open(data_dir+"Beijing", "r")
+    f2 = open(data_dir+"Tianjin","r")
+    f3 = open(data_dir+"Huludao","r")
     buff = []
     for i in range(71):
 	buff.append([])
     count = 0
     for line in f1.readlines()[i:i+71]:
         ls = line.split('#')
-        buff[count].append(map(float,ls[4:16]))
+        buff[count].extend(map(float,ls[4:16]))
         count = count+1
     f1.close()
     count = 0
     for line in f2.readlines()[i:i+71]:
         ls = line.split('#')
-        buff.append(map(float,ls[4:16]))
+        buff[count].extend(map(float,ls[4:16]))
         count = count+1
     f2.close()
     count = 0
     for line in f3.readlines()[i:i+71]:
         ls = line.split('#')
-        buff.append(map(float,ls[4:16]))
+        buff[count].extend(map(float,ls[4:16]))
         count = count+1
     f3.close()
     data.append(buff)
 
-set = np.array(data)
-target = np.array(target_set)
+s_data = random.shuffle(data)
+s_target = random.shuffle(target_set)
+set = np.array(s_data[:12288])
+target = np.array(s_targe[:12288])
+val_set = np.array(s_data[12288:])
+val_target = np.array(s_target[12288:])
 # np.append(target, 32)
 # ----------------------remain to be changed---------------------
 
@@ -103,14 +109,13 @@ model.fit(set, target, nb_epoch=100, batch_size=32)
 '''
 
 
-
 # LSTM VER
 model = Sequential()
 # model.add(Embedding(1000, 256, input_length=322))
-model.add(LSTM(batch_input_shape=(384, 71, 36), output_dim=256, activation='sigmoid', inner_activation='hard_sigmoid'))
+model.add(LSTM(batch_input_shape=(384,71, 36),return_sequences=True, stateful=True, output_dim=256, activation='sigmoid', inner_activation='hard_sigmoid'))
 model.add(Activation("relu"))
-#model.add(LSTM((384,256),output_dim=256, activation='sigmoid', inner_activation='hard_sigmoid'))
-#model.add(Activation("relu"))
+model.add(LSTM( output_dim = 256, activation='sigmoid', inner_activation='hard_sigmoid', name = "LSTM-2"))
+model.add(Activation("relu"))
 #model.add(LSTM((384,256),output_dim=128, activation='sigmoid', inner_activation='hard_sigmoid'))
 #model.add(Activation("relu"))
 model.add(Dense(3))
@@ -120,7 +125,7 @@ model.compile(loss='mae',
               metrics=['accuracy'])
 keras.optimizers.Adagrad(lr=0.01, epsilon=1e-08)
 
-model.fit(set, target, batch_size=384, nb_epoch=1000)
+model.fit(set, target, batch_size=384, nb_epoch=1000, validation_data=(val_set, val_target))
 # score = model.evaluate(testset, testtarget, batch_size=16)
 
 
