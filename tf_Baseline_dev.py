@@ -1,9 +1,11 @@
+#coding=utf-8
 import numpy as np
 import tensorflow as tf
 from tensorflow.contrib import rnn
 import random
 
 
+hop = 71
 timestep_size = 71                # Hours of looking ahead
 output_parameters = 3   # Number of predicting parameters
 num_stations = 3        # Number of monitoring stations
@@ -106,9 +108,10 @@ keep_prob = tf.placeholder(tf.float32)
 #             Construct LSTM cells
 # --------------------------------------------
 
-lstm_cell = rnn.BasicLSTMCell(num_units=hidden_size,
+lstm_cell = rnn.LSTMCell(num_units=hidden_size,
                               forget_bias=1.0,
                               state_is_tuple=True)
+#                              time_major=False)
 
 lstm_cell = rnn.DropoutWrapper(cell=lstm_cell,
                                input_keep_prob=1.0,
@@ -124,9 +127,8 @@ init_state = mlstm_cell.zero_state(batch_size, dtype=tf.float32)
 # ** 或者，可以取 h_state = state[-1][1] 作为最后输出
 # ** 最后输出维度是 [batch_size, hidden_size]
 outputs, state = tf.nn.dynamic_rnn(mlstm_cell,
-                                   inputs=X,
-                                   initial_state=init_state,
-                                   time_major=False)
+                                   inputs=_X,
+                                   initial_state=init_state)
 h_state = outputs[:, -1, :]  # 或者 h_state = state[-1][1]
 
 # *************** 为了更好的理解 LSTM 工作原理，我们把上面 步骤6 中的函数自己来实现 ***************
@@ -156,19 +158,26 @@ y_pre = tf.matmul(h_state, W) + bias
 
 cross_entropy = -tf.reduce_mean(y * tf.log(y_pre))
 train_op = tf.train.AdamOptimizer(lr).minimize(cross_entropy)
+loss = tf.reduce_mean(tf.abs(y_pre-y),0)
 
 correct_prediction = tf.equal(tf.argmax(y_pre,1), tf.argmax(y,1))
 accuracy = tf.reduce_mean(tf.cast(correct_prediction, "float"))
 
 
 sess.run(tf.global_variables_initializer())
-
-for i in range(2000):
+count = 0
+for i in range(6000):
     _batch_size = 384
     batch = random.randint(5, 36)
+    start = batch*_batch_size
+    end = (batch+1)*_batch_size
     sess.run(train_op,
-             feed_dict={_X:data[batch*_batch_size:(batch+1)*_batch_size, :, :],
-                        y: data[batch*_batch_size:(batch+1)*_batch_size, :],
-                        keep_prob: 1.0,
-                        batch_size: _batch_size})
-
+             feed_dict={_X:data[start:end],
+                        y: target_set[start:end],
+                        keep_prob: 0.5,
+                        batch_size: 384})
+#    print("========Iter:"+str(i)+",Accuracy:========",(acc))
+    if(i%20!=0):
+        acc = sess.run(loss,feed_dict={_X:data[1152:1536],y:target_set[1152:1536],batch_size:384,keep_prob:1})
+        print("Epoch:"+str(count)+str(acc))
+        count = count+1
