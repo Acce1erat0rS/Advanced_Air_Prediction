@@ -10,6 +10,8 @@ timestep_size = 71                # Hours of looking ahead
 output_parameters = 3   # Number of predicting parameters
 num_stations = 3        # Number of monitoring stations
 
+training_epochs = 2000
+_batch_size = 384
 
 data_dir = "/home/spica/mnt_device/aqi/dev_data/timesub/"
 def process(x):
@@ -78,24 +80,6 @@ set = np.array(X[1920:])
 target = np.array(y[1920:])
 val_set = np.array(X[:1920])
 val_target = np.array(y[:1920])
-
-# DENSE VER
-'''
-# build the model
-model = Sequential()
-model.add(Dense(output_dim=128, input_dim=322))
-model.add(Activation("relu"))
-model.add(Dense(output_dim=64))
-model.add(Activation("relu"))
-model.add(Dense(output_dim=1))
-
-# compile the model
-keras.optimizers.SGD(lr=0.0001, momentum=0.1, decay=0.05, nesterov=False)
-model.compile(loss='mae', optimizer='sgd', metrics=['accuracy'])
-
-# train the model
-model.fit(set, target, nb_epoch=100, batch_size=32)
-'''
 
 
 sess = tf.InteractiveSession()
@@ -166,18 +150,16 @@ accuracy = tf.reduce_mean(tf.cast(correct_prediction, "float"))
 
 sess.run(tf.global_variables_initializer())
 count = 0
-for i in range(6000):
-    _batch_size = 384
-    batch = random.randint(5, 36)
-    start = batch*_batch_size
-    end = (batch+1)*_batch_size
-    sess.run(train_op,
-             feed_dict={_X:data[start:end],
-                        y: target_set[start:end],
-                        keep_prob: 0.5,
-                        batch_size: 384})
-#    print("========Iter:"+str(i)+",Accuracy:========",(acc))
-    if(i%20!=0):
+for i in range(training_epochs):
+    for batch in range(5, 36):
+        start = batch*_batch_size
+        end = (batch+1)*_batch_size
+        sess.run(train_op,
+                 feed_dict={_X:data[start:end],
+                            y: target_set[start:end],
+                            keep_prob: 0.5,
+                            batch_size: 384})
+    #    print("========Iter:"+str(i)+",Accuracy:========",(acc))
+    if(i%3!=0):
         acc = sess.run(loss,feed_dict={_X:data[1152:1536],y:target_set[1152:1536],batch_size:384,keep_prob:1})
-        print("Epoch:"+str(count)+str(acc))
-        count = count+1
+        print("Epoch:"+str(i)+str(acc))

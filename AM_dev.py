@@ -108,8 +108,8 @@ while(cur_end < end - (120 + 288) * 3600):
 print(len(target_set))
 np_data = np.asarray(data)
 np_target = np.asarray(target_set)
-print("Target shape :",np_target.shape)
-print("Data shape : :",np_data.shape)
+print("Target shape :", np_target.shape)
+print("Data shape : :", np_data.shape)
 # training_data = np.hstack((np_data,np_target))
 # np.random.shuffle(training_data)
 # X = training_data[:, :-1]
