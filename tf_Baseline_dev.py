@@ -141,10 +141,11 @@ bias = tf.Variable(tf.constant(0.1,shape=[output_parameters]),
 y_pre = tf.matmul(h_state, W) + bias
 
 cross_entropy = -tf.reduce_mean(y * tf.log(y_pre))
-train_op = tf.train.AdamOptimizer(lr).minimize(cross_entropy)
-loss = tf.reduce_mean(tf.abs(y_pre-y),0)
+loss = tf.reduce_mean(tf.abs(y_pre-y), 0)
 
-correct_prediction = tf.equal(tf.argmax(y_pre,1), tf.argmax(y,1))
+train_op = tf.train.AdamOptimizer(lr).minimize(loss)
+
+correct_prediction = tf.equal(tf.argmax(y_pre, 1), tf.argmax(y,1))
 accuracy = tf.reduce_mean(tf.cast(correct_prediction, "float"))
 
 
