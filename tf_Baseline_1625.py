@@ -40,18 +40,24 @@ raw_data = []
 
 print "Reading data from disk"
 FileList = os.listdir(data_dir)
-reading = pb.ProgressBar(len(FileList))
+reading = pb.ProgressBar(total = len(FileList))
+count = 0
 for FileItem in FileList:
     reading.move()
+    count-=1
+    if count<0:
+        count = 20
+        reading.log('Processing : ' + FileItem + ' till 1448564400')
     path = os.path.join(data_dir, FileItem)
     if os.path.isfile(path):
         f1 = open(data_dir + FileItem, 'rb')
         step = []
         for line in f1.readlines():
             ls = line.split('#')
-            for item in ls:
-                if item == "":
-                    item = 0
+            for i in range(len(ls)):
+                if ls[i] == '':
+                    ls[i] = '0'
+            	    # print(ls[4:16])
             step.append(map(float, ls[4:16]))
         raw_data.append(step)
 print np.shape(raw_data)
