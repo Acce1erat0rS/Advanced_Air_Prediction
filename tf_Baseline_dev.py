@@ -3,9 +3,12 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.contrib import rnn
 import random
+import threading
+import os
 
 
-hop = 71
+seqLength = 71
+hop = 24
 timestep_size = 71                # Hours of looking ahead
 output_parameters = 3   # Number of predicting parameters
 num_stations = 3        # Number of monitoring stations
@@ -13,7 +16,7 @@ num_stations = 3        # Number of monitoring stations
 training_epochs = 2000
 _batch_size = 384
 
-data_dir = "/home/spica/mnt_device/aqi/dev_data/timesub/"
+data_dir = "../tf_learn/dev_data/"
 def process(x):
     if x == '?':
         return 0.0
@@ -36,14 +39,43 @@ layer_num = 3
 data = []
 target_set = []
 
+raw_data = []
+
+print "Reading data from disk"
+list = os.listdir(data_dir)
+for file in list:
+    path = os.path.join(data_dir, file)
+    if os.path.isfile(path):
+        f1 = open(data_dir + file, 'rb')
+        step = []
+        for line in f1.readlines():
+            ls = line.split('#')
+            step.append(map(float, ls[4:16]))
+        raw_data.append(step)
+#print raw_data
+print np.shape(raw_data)
+
 # defines how many hours is used to predict
 
 print("Processing target set")
-start = 1395691200;
-end = 1448564400;
-cur_start = start;
-cur_end = start+hop*3600;
+start = 1395691200
+end = 1448564400
+cur_start = start
+cur_end = start + seqLength * 3600
 
+for i in range(len(raw_data)-seqLength-hop):
+    buff = []
+    for j in range(seqLength):
+        hour = []
+        for line in raw_data[i+j]:
+            hour = hour+line[:]
+        buff.append(hour)
+    data.append(buff)
+    ans = raw_data[i+seqLength+hop]
+    #print(ans[0][3:5])
+    target_set.append( ans[0][2:5])
+
+'''
 while(cur_end<end-(120+288)*3600):
     buff = []
     for i in range(hop):
@@ -60,8 +92,9 @@ while(cur_end<end-(120+288)*3600):
         ls = line.split("#")
         target_set.append(map(float,ls[7:10]))
         break
-    cur_start = cur_start+3600;
-    cur_end = cur_end+3600;
+    cur_start = cur_start+3600
+    cur_end = cur_end+3600
+'''
 # s_target = random.shuffle(target_set)
 print(len(target_set))
 np_data = np.asarray(data)
