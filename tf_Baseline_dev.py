@@ -17,6 +17,8 @@ training_epochs = 2000
 _batch_size = 384
 
 data_dir = "../tf_learn/dev_data/"
+
+
 def process(x):
     if x == '?':
         return 0.0
@@ -38,7 +40,6 @@ layer_num = 3
 # Read from the file of the training set
 data = []
 target_set = []
-
 raw_data = []
 
 print "Reading data from disk"
@@ -194,6 +195,6 @@ for i in range(training_epochs):
                             keep_prob: 0.5,
                             batch_size: 384})
     #    print("========Iter:"+str(i)+",Accuracy:========",(acc))
-    if(i%3!=0):
-        acc = sess.run(loss,feed_dict={_X:data[1152:1536],y:target_set[1152:1536],batch_size:384,keep_prob:1})
-        print("Epoch:"+str(i)+str(acc))
+
+    acc = sess.run(loss, feed_dict={_X:data[1152:1536],y:target_set[1152:1536],batch_size:384,keep_prob:1})
+    print("Epoch:"+str(i)+str(acc))

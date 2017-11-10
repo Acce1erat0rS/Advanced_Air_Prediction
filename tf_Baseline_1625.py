@@ -4,9 +4,11 @@ import tensorflow as tf
 from tensorflow.contrib import rnn
 import random
 import ProgressBar as pb
+import os
 
 
-hop = 71
+seqLength = 71
+hop = 24
 timestep_size = 71                # Hours of looking ahead
 output_parameters = 3   # Number of predicting parameters
 num_stations = 1625     # Number of monitoring stations
@@ -34,44 +36,48 @@ layer_num = 3
 # Read from the file of the training set
 data = []
 target_set = []
+raw_data = []
 
-# defines how many hours is used to predict
+print "Reading data from disk"
+FileList = os.listdir(data_dir)
+reading = pb.ProgressBar(len(FileList))
+for FileItem in FileList:
+    reading.move()
+    path = os.path.join(data_dir, FileItem)
+    if os.path.isfile(path):
+        f1 = open(data_dir + FileItem, 'rb')
+        step = []
+        for line in f1.readlines():
+            ls = line.split('#')
+            for item in ls:
+                if item == "":
+                    item = 0
+            step.append(map(float, ls[4:16]))
+        raw_data.append(step)
+print np.shape(raw_data)
+
 
 print("Processing target set")
-start = 1395691200;
-end = 1448564400;
-cur_start = start;
-cur_end = start+hop*3600;
-bar = pb.ProgressBar(total = (end-start)/3600)
-while(cur_end<end-(120+288)*3600):
+start = 1395691200
+end = 1448564400
+cur_start = start
+cur_end = start + seqLength * 3600
+bar = pb.ProgressBar(total = len(raw_data)-seqLength-hop)
+
+
+for i in range(len(raw_data)-seqLength-hop):
     bar.move()
     bar.log('Processing : ' + str(cur_end) + ' till 1448564400')
     buff = []
-    for i in range(hop):
+    for j in range(seqLength):
         hour = []
-        f1 = open(data_dir+(str)(cur_start+i*3600),'rb')
-        for line in f1.readlines():
-            ls = line.split('#')
-            # print(ls)
-            this = []
-            for item in ls[4:16]:
-                if item == '':
-                    # this.append(0.0)
-                    pass
-                else:
-                    this.append(float(item))
-            hour = hour + this
-            # hour = hour+(map(float,ls[4:16]))
-        f1.close()
-        buff.append(hour);
+        for line in raw_data[i+j]:
+            hour = hour+line[:]
+        buff.append(hour)
     data.append(buff)
-    f1 = open(data_dir+(str)(cur_start+120*3600),'rb')
-    for line in f1.readlines():
-        ls = line.split("#")
-        target_set.append(map(float,ls[7:10]))
-        break
-    cur_start = cur_start+3600;
-    cur_end = cur_end+3600;
+    ans = raw_data[i+seqLength+hop]
+    target_set.append(ans[0][2:5])
+
 # s_target = random.shuffle(target_set)
 print(len(target_set))
 np_data = np.asarray(data)
@@ -82,8 +88,8 @@ print("Data shape : :",np_data.shape)
 # np.random.shuffle(training_data)
 # X = training_data[:, :-1]
 #y  = training_data[:, -1]
-numpy.save("../data/data.npy",data)
-numpy.save("../data/target.npy",target_set)
+np.save("../data/data.npy", data)
+np.save("../data/target.npy", target_set)
 
 
 X = np_data
