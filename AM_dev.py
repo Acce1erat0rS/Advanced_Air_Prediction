@@ -178,7 +178,7 @@ atm2 = Proception(atm1, 128, 64)
 aqi1 = Proception(aqi_x, num_stations*aqi_dim, 128)
 aqi2 = Proception(aqi1, 128, 64)
 
-con = tf.concat(1, [aqi2, atm2])
+con = tf.concat([aqi2, atm2], 1)
 
 #result = Proception(con, 128, 3)
 keep_prob = tf.placeholder(tf.float32)
@@ -205,21 +205,17 @@ sess.run(tf.global_variables_initializer())
 count = 0
 for i in range(6000):
     _batch_size = 384
-    batch = random.randint(5, 36)
-    start = batch*_batch_size
-    end = (batch+1)*_batch_size
+    batch = random.randint(100, 417)
     sess.run(train_op,
-             feed_dict={atm_x: atm_data[start:end],
-                        aqi_x: aqi_data[start:end],
+             feed_dict={atm_x: atm_data[batch],
+                        aqi_x: aqi_data[batch],
                         y: target_set[start:end],
-                        keep_prob: 0.5,
-                        batch_size: 384})
+                        keep_prob: 0.5})
 #    print("========Iter:"+str(i)+",Accuracy:========",(acc))
     if(i%21 != 0):
-        acc = sess.run(loss, feed_dict={atm_x: atm_data[1152:1536],
-                                        aqi_x: aqi_data[1152:1536],
-                                        y: target_set[1152:1536],
-                                        batch_size: 384,
+        acc = sess.run(loss, feed_dict={atm_x: atm_data[60:99],
+                                        aqi_x: aqi_data[60:99],
+                                        y: target_set[60:99],
                                         keep_prob: 1})
         print("Epoch:" + str(count) + str(acc))
         count = count+1
