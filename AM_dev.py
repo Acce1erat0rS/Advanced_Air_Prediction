@@ -7,6 +7,10 @@ from tensorflow.contrib import rnn
 import random
 import threading
 import os
+import gc
+
+from Archetectures import LSTM
+from Archetectures import Affine
 
 
 seqLength = 71
@@ -14,6 +18,9 @@ hop = 24
 timestep_size = 71                # Hours of looking ahead
 output_parameters = 3   # Number of predicting parameters
 num_stations = 3        # Number of monitoring stations
+
+phase_1 = 200
+phase_2 = 200
 
 training_epochs = 2000
 _batch_size = 384
@@ -87,7 +94,7 @@ atm_data = []
 aqi_data = []
 target_set = []
 seq_target = []
-
+wth_pre = []
 
 # TODO:Change latitude and longitude to an uni encoding
 
@@ -109,24 +116,31 @@ i = 0
 while i < len(raw_data)-seqLength-hop:
     aqi_buff = []
     atm_buff = []
+    # wth_buff = []
     for j in range(seqLength):
         aqi_hour = []
         atm_hour = []
         seq_ans = []
+        wth_hor = []
         for line in raw_data[i+j]:
             aqi_hour = aqi_hour + line[:7]
             atm_hour = atm_hour + line[0:2]+line[8:]
         aqi_buff.append(aqi_hour)
         atm_buff.append(atm_hour)
         seq_ans.append(raw_data[j + seqLength + hop][0][2:5])
+        wth_hor.append(raw_data[j + seqLength + hop][0][8:])
     aqi_data.append(aqi_buff)
     atm_data.append(atm_buff)
     seq_target.append(seq_ans)
+    wth_pre.append(wth_hor)
     ans = raw_data[i+seqLength+hop]
     target_set.append(ans[0][2:5])
     i += seqLength/2
 
 # s_target = random.shuffle(target_set)
+
+del raw_data
+gc.collect()
 
 print("Converting AQI into nmpy format...")
 np_aqi_data = np.asarray(aqi_data)
@@ -145,6 +159,7 @@ print("Target shape     :  " + str(np.shape(np_target)))
 print("AQI Data shape   :  " + str(np.shape(np_aqi_data)))
 print("ATM Data shape   :  " + str(np.shape(np_atm_data)))
 
+
 # training_data = np.hstack((np_data,np_target))
 # np.random.shuffle(training_data)
 # X = training_data[:, :-1]
@@ -155,39 +170,41 @@ sess = tf.InteractiveSession()
 batch_size = tf.placeholder(tf.int32)
 _X = tf.placeholder(tf.float32, [None, timestep_size, 36])     # TODO change this to the divided ver
 y = tf.placeholder(tf.float32, [3])
-# atm_x = tf.placeholder(tf.float32, [None, timestep_size, atm_dim])
-# aqi_x = tf.placeholder(tf.float32, [None, timestep_size, aqi_dim])
+atm_x = tf.placeholder(tf.float32, [None, timestep_size, atm_dim])
+aqi_x = tf.placeholder(tf.float32, [None, timestep_size, aqi_dim])
+weather_pre = tf.placeholder(tf.float32, [None, hop, atm_dim])
+train = tf.placeholder(tf.float32)
 # reshape
 
-atm_x = tf.placeholder(tf.float32, [None, num_stations*atm_dim])
-aqi_x = tf.placeholder(tf.float32, [None, num_stations*aqi_dim])
+# atm_x = tf.placeholder(tf.float32, [None, num_stations*atm_dim])
+# aqi_x = tf.placeholder(tf.float32, [None, num_stations*aqi_dim])
 
+atm_out = LSTM(inputs=atm_x,
+               hidden_size=128,
+               layer_num=3,
+               batch_size=16,
+               keep_prob=train)
 
-def Proception(input, input_dim, output_dim):
-    m_W = tf.Variable(tf.truncated_normal([input_dim,
-                                           output_dim],
-                                            stddev=0.1),
-                        dtype=tf.float32)
-    m_bias = tf.Variable(tf.constant(0.1, shape=[output_dim]),
-                           dtype=tf.float32)
+aqi_out = LSTM(inputs=atm_x,
+               hidden_size=128,
+               layer_num=3,
+               batch_size=16,
+               keep_prob=train)
 
-    return tf.sigmoid(tf.matmul(input, m_W) + m_bias)
+con = tf.concat([atm_out, aqi_out], 1)
 
-atm1 = Proception(atm_x, num_stations*atm_dim, 128)
-atm2 = Proception(atm1, 128, 64)
+to_weather = Affine(con, 128, atm_dim)
 
-aqi1 = Proception(aqi_x, num_stations*aqi_dim, 128)
-aqi2 = Proception(aqi1, 128, 64)
-
-con = tf.concat([aqi2, atm2], 1)
-
-#result = Proception(con, 128, 3)
 keep_prob = tf.placeholder(tf.float32)
 
-# --------------------------------------------
-#    Convert LSTM output to tensor of three
-# --------------------------------------------
-W = tf.Variable(tf.truncated_normal([128, output_parameters],
+
+cross_entropy = -tf.reduce_mean(weather_pre * tf.log(to_weather))
+train_weather = tf.train.AdamOptimizer(lr).minimize(cross_entropy)
+wth_loss = tf.reduce_mean(tf.abs(to_weather-wth_pre), 0)
+
+
+
+W = tf.Variable(tf.truncated_normal([256, output_parameters],
                                     stddev=0.1),
                 dtype=tf.float32)
 bias = tf.Variable(tf.constant(0.1, shape=[output_parameters]),
@@ -198,25 +215,41 @@ cross_entropy = -tf.reduce_mean(y * tf.log(y_pre))
 train_op = tf.train.AdamOptimizer(lr).minimize(cross_entropy)
 loss = tf.reduce_mean(tf.abs(y_pre-y), 0)
 
-correct_prediction = tf.equal(tf.argmax(y_pre, 1), tf.argmax(y, 1))
-accuracy = tf.reduce_mean(tf.cast(correct_prediction, "float"))
-
-
 sess.run(tf.global_variables_initializer())
 count = 0
-for i in range(6000):
-    _batch_size = 384
+for i in range(phase_1):
+    batch = random.randint(100, 416)
+    sess.run(train_weather,
+             feed_dict={atm_x: atm_data[batch],
+                        aqi_x: aqi_data[batch],
+                        weather_pre: wth_pre[batch],
+                        keep_prob: 0.5})
+#    print("========Iter:"+str(i)+",Accuracy:========",(acc))
+    if(i%21 != 0):
+        acc = sess.run(wth_loss, feed_dict={atm_x: atm_data[99],
+                                            aqi_x: aqi_data[99],
+                                            weather_pre: wth_pre[99],
+                                            keep_prob: 1})
+        print("Epoch:" + str(count) + str(acc))
+        count = count+1
+
+
+for i in range(phase_2):
     batch = random.randint(100, 416)
     sess.run(train_op,
              feed_dict={atm_x: atm_data[batch],
                         aqi_x: aqi_data[batch],
                         y: target_set[batch],
                         keep_prob: 0.5})
-#    print("========Iter:"+str(i)+",Accuracy:========",(acc))
-    if(i%21 != 0):
+    #    print("========Iter:"+str(i)+",Accuracy:========",(acc))
+    if (i % 21 != 0):
         acc = sess.run(loss, feed_dict={atm_x: atm_data[99],
                                         aqi_x: aqi_data[99],
                                         y: target_set[99],
                                         keep_prob: 1})
         print("Epoch:" + str(count) + str(acc))
-        count = count+1
+        count = count + 1
+
+
+
+    pass
