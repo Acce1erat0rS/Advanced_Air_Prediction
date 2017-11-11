@@ -20,7 +20,7 @@ output_parameters = 3   # Number of predicting parameters
 num_stations = 3        # Number of monitoring stations
 
 phase_1 = 200
-phase_2 = 200
+phase_2 = 1
 
 training_epochs = 2000
 _batch_size = 384
@@ -216,40 +216,48 @@ train_op = tf.train.AdamOptimizer(lr).minimize(cross_entropy)
 loss = tf.reduce_mean(tf.abs(y_pre-y), 0)
 
 sess.run(tf.global_variables_initializer())
-count = 0
-for i in range(phase_1):
-    batch = random.randint(100, 416)
-    sess.run(train_weather,
-             feed_dict={atm_x: atm_data[batch],
-                        aqi_x: aqi_data[batch],
-                        weather_pre: wth_pre[batch],
-                        keep_prob: 0.5})
-#    print("========Iter:"+str(i)+",Accuracy:========",(acc))
-    if(i%21 != 0):
-        acc = sess.run(wth_loss, feed_dict={atm_x: atm_data[99],
-                                            aqi_x: aqi_data[99],
-                                            weather_pre: wth_pre[99],
-                                            keep_prob: 1})
-        print("Epoch:" + str(count) + str(acc))
-        count = count+1
+count_all = 0
 
-
-for i in range(phase_2):
-    batch = random.randint(100, 416)
-    sess.run(train_op,
-             feed_dict={atm_x: atm_data[batch],
-                        aqi_x: aqi_data[batch],
-                        y: target_set[batch],
-                        keep_prob: 0.5})
+for j in range(20):
+    count = 0
+    for i in range(phase_1):
+        batch = random.randint(100, 416)
+        sess.run(train_weather,
+                 feed_dict={atm_x: atm_data[batch],
+                            aqi_x: aqi_data[batch],
+                            weather_pre: wth_pre[batch],
+                            keep_prob: 0.5})
     #    print("========Iter:"+str(i)+",Accuracy:========",(acc))
-    if (i % 21 != 0):
-        acc = sess.run(loss, feed_dict={atm_x: atm_data[99],
-                                        aqi_x: aqi_data[99],
-                                        y: target_set[99],
-                                        keep_prob: 1})
-        print("Epoch:" + str(count) + str(acc))
-        count = count + 1
+        if(i%21 != 0):
+            acc = sess.run(wth_loss, feed_dict={atm_x: atm_data[99],
+                                                aqi_x: aqi_data[99],
+                                                weather_pre: wth_pre[99],
+                                                keep_prob: 1})
+            print("     Phase1: Epoch:" + str(count) + str(acc))
+            count = count+1
+        phase_1 -= 1
+    count = 0
+    for i in range(phase_2):
+        batch = random.randint(100, 416)
+        sess.run(train_op,
+                 feed_dict={atm_x: atm_data[batch],
+                            aqi_x: aqi_data[batch],
+                            y: target_set[batch],
+                            keep_prob: 0.5})
+        #    print("========Iter:"+str(i)+",Accuracy:========",(acc))
+        if (i % 21 != 0):
+            acc = sess.run(loss, feed_dict={atm_x: atm_data[99],
+                                            aqi_x: aqi_data[99],
+                                            y: target_set[99],
+                                            keep_prob: 1})
+            print("     Phase 2: Epoch:" + str(count) + str(acc))
+            count = count + 1
 
+        phase_2 += 1
 
-
-    pass
+    acc = sess.run(loss, feed_dict={atm_x: atm_data[99],
+                                    aqi_x: aqi_data[99],
+                                    y: target_set[99],
+                                    keep_prob: 1})
+    print("Overall : " + str(count_all) + str(acc))
+    count_all+=1
