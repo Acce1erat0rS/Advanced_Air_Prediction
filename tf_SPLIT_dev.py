@@ -1,20 +1,26 @@
 #coding=utf-8
+
+# SPLIT stand for Strategic Poly Logic Initiative Technology
 import numpy as np
 import tensorflow as tf
 from tensorflow.contrib import rnn
 import random
-import ProgressBar as pb
+import threading
 import os
 
 
 seqLength = 71
 hop = 24
-timestep_size = 71      # Hours of looking ahead
+timestep_size = 71                # Hours of looking ahead
 output_parameters = 3   # Number of predicting parameters
-num_stations = 1625     # Number of monitoring stations
+num_stations = 3        # Number of monitoring stations
+
+training_epochs = 2000
+_batch_size = 384
+
+data_dir = "../tf_learn/dev_data/"
 
 
-data_dir = "/home/spica/mnt_device/data/aqi_harvard/binary_timesub/"
 def process(x):
     if x == '?':
         return 0.0
@@ -39,40 +45,28 @@ target_set = []
 raw_data = []
 
 print "Reading data from disk"
-FileList = os.listdir(data_dir)
-reading = pb.ProgressBar(total=len(FileList))
-count = 0
-for FileItem in FileList:
-    reading.move()
-    count -= 1
-    if count < 0:
-        count = 20
-        reading.log('Processing : ' + FileItem + ' till 1448564400')
-    path = os.path.join(data_dir, FileItem)
+list = os.listdir(data_dir)
+for file in list:
+    path = os.path.join(data_dir, file)
     if os.path.isfile(path):
-        f1 = open(data_dir + FileItem, 'rb')
+        f1 = open(data_dir + file, 'rb')
         step = []
         for line in f1.readlines():
             ls = line.split('#')
-            for i in range(len(ls)):
-                if ls[i] == '':
-                    ls[i] = '0'
             step.append(map(float, ls[4:16]))
         raw_data.append(step)
+#print raw_data
 print np.shape(raw_data)
 
+# defines how many hours is used to predict
 
 print("Processing target set")
 start = 1395691200
 end = 1448564400
 cur_start = start
 cur_end = start + seqLength * 3600
-bar = pb.ProgressBar(total=(len(raw_data)-seqLength-hop)/seqLength)
 
-i=0
-while i < range(len(raw_data)-seqLength-hop):
-    bar.move()
-    bar.log('Processing : ' + str(cur_end) + ' till 1448564400')
+for i in range(len(raw_data)-seqLength-hop):
     buff = []
     for j in range(seqLength):
         hour = []
@@ -81,19 +75,39 @@ while i < range(len(raw_data)-seqLength-hop):
         buff.append(hour)
     data.append(buff)
     ans = raw_data[i+seqLength+hop]
+    #print(ans[0][3:5])
     target_set.append(ans[0][2:5])
-    i += seqLength
 
+'''
+while(cur_end<end-(120+288)*3600):
+    buff = []
+    for i in range(hop):
+        hour = []
+        f1 = open(data_dir+(str)(cur_start+i*3600),'rb')
+        for line in f1.readlines():
+            ls = line.split('#')
+            hour = hour+(map(float,ls[4:16]))
+        f1.close()
+        buff.append(hour);
+    data.append(buff)
+    f1 = open(data_dir+(str)(cur_start+120*3600),'rb')
+    for line in f1.readlines():
+        ls = line.split("#")
+        target_set.append(map(float,ls[7:10]))
+        break
+    cur_start = cur_start+3600
+    cur_end = cur_end+3600
+'''
 # s_target = random.shuffle(target_set)
 print(len(target_set))
 np_data = np.asarray(data)
 np_target = np.asarray(target_set)
-print("Target shape :"+str(np_target.shape))
-print("Data shape   :"+str(np_data.shape))
-
-np.save("../data/data.npy", data)
-np.save("../data/target.npy", target_set)
-
+print("Target shape :",np_target.shape)
+print("Data shape : :",np_data.shape)
+# training_data = np.hstack((np_data,np_target))
+# np.random.shuffle(training_data)
+# X = training_data[:, :-1]
+#y  = training_data[:, -1]
 
 X = np_data
 y = np_target
@@ -102,24 +116,6 @@ set = np.array(X[1920:])
 target = np.array(y[1920:])
 val_set = np.array(X[:1920])
 val_target = np.array(y[:1920])
-
-# DENSE VER
-'''
-# build the model
-model = Sequential()
-model.add(Dense(output_dim=128, input_dim=322))
-model.add(Activation("relu"))
-model.add(Dense(output_dim=64))
-model.add(Activation("relu"))
-model.add(Dense(output_dim=1))
-
-# compile the model
-keras.optimizers.SGD(lr=0.0001, momentum=0.1, decay=0.05, nesterov=False)
-model.compile(loss='mae', optimizer='sgd', metrics=['accuracy'])
-
-# train the model
-model.fit(set, target, nb_epoch=100, batch_size=32)
-'''
 
 
 sess = tf.InteractiveSession()
@@ -181,27 +177,26 @@ bias = tf.Variable(tf.constant(0.1,shape=[output_parameters]),
 y_pre = tf.matmul(h_state, W) + bias
 
 cross_entropy = -tf.reduce_mean(y * tf.log(y_pre))
-train_op = tf.train.AdamOptimizer(lr).minimize(cross_entropy)
-loss = tf.reduce_mean(tf.abs(y_pre-y),0)
+loss = tf.reduce_mean(tf.abs(y_pre-y), 0)
 
-correct_prediction = tf.equal(tf.argmax(y_pre,1), tf.argmax(y,1))
+train_op = tf.train.AdamOptimizer(lr).minimize(loss)
+
+correct_prediction = tf.equal(tf.argmax(y_pre, 1), tf.argmax(y,1))
 accuracy = tf.reduce_mean(tf.cast(correct_prediction, "float"))
 
 
 sess.run(tf.global_variables_initializer())
 count = 0
-for i in range(6000):
-    _batch_size = 384
-    batch = random.randint(5, 36)
-    start = batch*_batch_size
-    end = (batch+1)*_batch_size
-    sess.run(train_op,
-             feed_dict={_X:data[start:end],
-                        y: target_set[start:end],
-                        keep_prob: 0.5,
-                        batch_size: 384})
-#    print("========Iter:"+str(i)+",Accuracy:========",(acc))
-    if(i%20!=0):
-        acc = sess.run(loss,feed_dict={_X:data[1152:1536],y:target_set[1152:1536],batch_size:384,keep_prob:1})
-        print("Epoch:"+str(count)+str(acc))
-        count = count+1
+for i in range(training_epochs):
+    for batch in range(5, 36):
+        start = batch*_batch_size
+        end = (batch+1)*_batch_size
+        sess.run(train_op,
+                 feed_dict={_X:data[start:end],
+                            y: target_set[start:end],
+                            keep_prob: 0.5,
+                            batch_size: 384})
+    #    print("========Iter:"+str(i)+",Accuracy:========",(acc))
+
+    acc = sess.run(loss, feed_dict={_X:data[1152:1536],y:target_set[1152:1536],batch_size:384,keep_prob:1})
+    print("Epoch:"+str(i)+str(acc))
