@@ -18,8 +18,8 @@ num_stations = 3        # Number of monitoring stations
 training_epochs = 2000
 _batch_size = 384
 
-atm_dim = 7
-aqi_dim = 5
+atm_dim = 6
+aqi_dim = 7
 
 data_dir = "../tf_learn/dev_data/"
 # data_dir = "/home/spica/mnt_device/aqi/dev_data/timesub/"
@@ -112,12 +112,13 @@ while i < len(raw_data)-seqLength-hop:
     for j in range(seqLength):
         aqi_hour = []
         atm_hour = []
+        seq_ans = []
         for line in raw_data[i+j]:
             aqi_hour = aqi_hour + line[:7]
             atm_hour = atm_hour + line[0:2]+line[8:]
         aqi_buff.append(aqi_hour)
         atm_buff.append(atm_hour)
-        seq_ans = raw_data[j + seqLength + hop][0][2:5]
+        seq_ans.append(raw_data[j + seqLength + hop][0][2:5])
     aqi_data.append(aqi_buff)
     atm_data.append(atm_buff)
     seq_target.append(seq_ans)
@@ -153,7 +154,7 @@ print("ATM Data shape   :  " + str(np.shape(np_atm_data)))
 sess = tf.InteractiveSession()
 batch_size = tf.placeholder(tf.int32)
 _X = tf.placeholder(tf.float32, [None, timestep_size, 36])     # TODO change this to the divided ver
-y = tf.placeholder(tf.float32, [None, 3])
+y = tf.placeholder(tf.float32, [3])
 # atm_x = tf.placeholder(tf.float32, [None, timestep_size, atm_dim])
 # aqi_x = tf.placeholder(tf.float32, [None, timestep_size, aqi_dim])
 # reshape
@@ -205,17 +206,17 @@ sess.run(tf.global_variables_initializer())
 count = 0
 for i in range(6000):
     _batch_size = 384
-    batch = random.randint(100, 417)
+    batch = random.randint(100, 416)
     sess.run(train_op,
              feed_dict={atm_x: atm_data[batch],
                         aqi_x: aqi_data[batch],
-                        y: target_set[start:end],
+                        y: target_set[batch],
                         keep_prob: 0.5})
 #    print("========Iter:"+str(i)+",Accuracy:========",(acc))
     if(i%21 != 0):
-        acc = sess.run(loss, feed_dict={atm_x: atm_data[60:99],
-                                        aqi_x: aqi_data[60:99],
-                                        y: target_set[60:99],
+        acc = sess.run(loss, feed_dict={atm_x: atm_data[99],
+                                        aqi_x: aqi_data[99],
+                                        y: target_set[99],
                                         keep_prob: 1})
         print("Epoch:" + str(count) + str(acc))
         count = count+1
