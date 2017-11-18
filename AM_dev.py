@@ -226,13 +226,13 @@ for j in range(20):
                  feed_dict={atm_x: atm_data[batch],
                             aqi_x: aqi_data[batch],
                             weather_pre: wth_pre[batch],
-                            keep_prob: 0.5})
+                            train: 0.5})
     #    print("========Iter:"+str(i)+",Accuracy:========",(acc))
         if(i%21 != 0):
             acc = sess.run(wth_loss, feed_dict={atm_x: atm_data[99],
                                                 aqi_x: aqi_data[99],
                                                 weather_pre: wth_pre[99],
-                                                keep_prob: 1})
+                                                train: 1})
             print("     Phase1: Epoch:" + str(count) + str(acc))
             count = count+1
         phase_1 -= 1
@@ -243,13 +243,13 @@ for j in range(20):
                  feed_dict={atm_x: atm_data[batch],
                             aqi_x: aqi_data[batch],
                             y: target_set[batch],
-                            keep_prob: 0.5})
+                            train: 0.5})
         #    print("========Iter:"+str(i)+",Accuracy:========",(acc))
         if (i % 21 != 0):
             acc = sess.run(loss, feed_dict={atm_x: atm_data[99],
                                             aqi_x: aqi_data[99],
                                             y: target_set[99],
-                                            keep_prob: 1})
+                                            train: 1})
             print("     Phase 2: Epoch:" + str(count) + str(acc))
             count = count + 1
 
@@ -258,6 +258,6 @@ for j in range(20):
     acc = sess.run(loss, feed_dict={atm_x: atm_data[99],
                                     aqi_x: aqi_data[99],
                                     y: target_set[99],
-                                    keep_prob: 1})
+                                    train: 1})
     print("Overall : " + str(count_all) + str(acc))
     count_all+=1
