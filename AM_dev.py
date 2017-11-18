@@ -183,13 +183,15 @@ atm_out = LSTM(inputs=atm_x,
                hidden_size=128,
                layer_num=3,
                batch_size=16,
-               keep_prob=train)
+               keep_prob=train,
+               scope='ATM')
 
 aqi_out = LSTM(inputs=atm_x,
                hidden_size=128,
                layer_num=3,
                batch_size=16,
-               keep_prob=train)
+               keep_prob=train,
+               scope='AQI')
 
 con = tf.concat([atm_out, aqi_out], 1)
 

@@ -8,8 +8,8 @@ import threading
 import os
 
 
-def LSTM(inputs, hidden_size, layer_num, batch_size, keep_prob,init_state):
-    with tf.variable_scope('rnn_cell', reuse=True):
+def LSTM(inputs, hidden_size, layer_num, batch_size, keep_prob, scope):
+    with tf.variable_scope(scope):
         lstm_cell = rnn.LSTMCell(num_units=hidden_size,
                                  forget_bias=1.0,
                                  state_is_tuple=True)
