@@ -1,4 +1,4 @@
-#coding=utf-8
+# coding=utf-8
 
 # SPLIT stand for Strategic Poly Logic Initiative Technology
 import numpy as np
@@ -21,6 +21,10 @@ num_stations = 3        # Number of monitoring stations
 
 phase_1 = 200
 phase_2 = 1
+
+
+do_phase_1 = [1,2,3,4,5,7,9,11,13,15,17,19,21,24,27,30,33,36,40,45,50,55,60]
+do_phase_2 = [5,10,14,17,20,23,26,29,32,35,37,39,41,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60]
 
 training_epochs = 2000
 _batch_size = 384
@@ -211,7 +215,6 @@ train_weather = tf.train.AdamOptimizer(lr).minimize(cross_entropy)
 wth_loss = tf.reduce_mean(tf.abs(flatten_wth-to_weather), 1)
 
 
-
 W = tf.Variable(tf.truncated_normal([256, output_parameters],
                                     stddev=0.1),
                 dtype=tf.float32)
@@ -224,12 +227,15 @@ train_op = tf.train.AdamOptimizer(lr).minimize(cross_entropy)
 loss = tf.reduce_mean(tf.abs(y_pre-y), 0)
 
 sess.run(tf.global_variables_initializer())
-count_all = 0
 
-for j in range(20):
+for j in range(200):
     count = 0
+    phase_1_acc = 0
+    phase_1_count = 0
+    phase_2_acc = 0
+    phase_2_count = 0
     for i in range(phase_1):
-        batch = random.randint(100, 400)
+    #for batch in range(100, 400):
         sess.run(train_weather,
                  feed_dict={atm_x: atm_data[batch:batch+16],
                             aqi_x: aqi_data[batch:batch+16],
@@ -237,17 +243,14 @@ for j in range(20):
                             train: 0.5})
     #    print("========Iter:"+str(i)+",Accuracy:========",(acc))
         if(i%21 != 0):
-            acc = 0
             for i in range(6):
-                acc += sess.run(wth_loss, feed_dict={atm_x: atm_data[i*16:(i+1)*16],
+                phase_1_count += 1
+                phase_1_acc += sess.run(wth_loss, feed_dict={atm_x: atm_data[i*16:(i+1)*16],
                                                 aqi_x: aqi_data[i*16:(i+1)*16],
                                                 weather_pre: wth_pre[i*16:(i+1)*16],
                                                 train: 1})
-                acc = acc/6
-                print("     Phase1: Epoch:" + str(count) + str(acc))
-                count = count+1
-        phase_1 -= 1
-    count = 0
+    phase_1_acc /= phase_1_count
+    print("     Phase1: Epoch" + str(j)+" :" + str(phase_1_acc))
     for i in range(phase_2):
         batch = random.randint(100, 400)
         sess.run(train_op,
@@ -256,20 +259,16 @@ for j in range(20):
                             y: target_set[batch:batch+16],
                             train: 0.5})
         #    print("========Iter:"+str(i)+",Accuracy:========",(acc))
-        if (i % 21 != 0):
-            
-            acc = sess.run(loss, feed_dict={atm_x: atm_data[99],
-                                            aqi_x: aqi_data[99],
-                                            y: target_set[99],
-                                            train: 1})
-            print("     Phase 2: Epoch:" + str(count) + str(acc))
-            count = count + 1
-
-        phase_2 += 1
-
-    acc = sess.run(loss, feed_dict={atm_x: atm_data[99],
-                                    aqi_x: aqi_data[99],
-                                    y: target_set[99],
-                                    train: 1})
-    print("Overall : " + str(count_all) + str(acc))
-    count_all+=1
+        for i in range(6):
+            phase_1_count += 1
+            phase_1_acc += sess.run(loss, feed_dict={atm_x: atm_data[i * 16:(i + 1) * 16],
+                                                         aqi_x: aqi_data[i * 16:(i + 1) * 16],
+                                                         weather_pre: wth_pre[i * 16:(i + 1) * 16],
+                                                         train: 1})
+    phase_2_acc /= phase_2_count
+    print("     Phase 2: Epoch" + str(j)+ " :" + str(phase_2_acc))
+    # acc = sess.run(loss, feed_dict={atm_x: atm_data[99],
+    #                                aqi_x: aqi_data[99],
+    #                                y: target_set[99],
+    #                                train: 1})
+    # print("Overall : " + str(count_all) + str(acc))
