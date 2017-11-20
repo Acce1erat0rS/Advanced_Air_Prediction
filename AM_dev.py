@@ -115,24 +115,27 @@ print("Preparing training set")
 i = 0
 while i < len(raw_data)-seqLength-hop:
     aqi_buff = []
+    wth_buff = []
     atm_buff = []
-    # wth_buff = []
+    for j in range(hop):
+        wth_hor = []
+        for line in raw_data[i+seqLength+hop]: 
+            wth_hor.append(raw_data[j + seqLength + hop][0][0:2]+raw_data[j + seqLength + hop][0][8:])
+        wth_buff.append(wth_hor)
     for j in range(seqLength):
         aqi_hour = []
         atm_hour = []
         seq_ans = []
-        wth_hor = []
         for line in raw_data[i+j]:
             aqi_hour = aqi_hour + line[:7]
             atm_hour = atm_hour + line[0:2]+line[8:]
         aqi_buff.append(aqi_hour)
         atm_buff.append(atm_hour)
         seq_ans.append(raw_data[j + seqLength + hop][0][2:5])
-        wth_hor.append(raw_data[j + seqLength + hop][0][8:])
     aqi_data.append(aqi_buff)
     atm_data.append(atm_buff)
     seq_target.append(seq_ans)
-    wth_pre.append(wth_hor)
+    wth_pre.append(wth_buff)
     ans = raw_data[i+seqLength+hop]
     target_set.append(ans[0][2:5])
     i += seqLength/2
@@ -158,6 +161,7 @@ print("Seq Target shape :  " + str(np.shape(np_seq_target)))
 print("Target shape     :  " + str(np.shape(np_target)))
 print("AQI Data shape   :  " + str(np.shape(np_aqi_data)))
 print("ATM Data shape   :  " + str(np.shape(np_atm_data)))
+print("WTH Data shape   :  " + str(np.shape(wth_pre)))
 
 
 # training_data = np.hstack((np_data,np_target))
@@ -170,15 +174,16 @@ sess = tf.InteractiveSession()
 batch_size = tf.placeholder(tf.int32)
 _X = tf.placeholder(tf.float32, [None, timestep_size, 36])     # TODO change this to the divided ver
 y = tf.placeholder(tf.float32, [3])
-atm_x = tf.placeholder(tf.float32, [None, timestep_size, atm_dim])
-aqi_x = tf.placeholder(tf.float32, [None, timestep_size, aqi_dim])
-weather_pre = tf.placeholder(tf.float32, [None, hop, atm_dim])
+atm_x = tf.placeholder(tf.float32, [None, timestep_size, atm_dim*num_stations])
+aqi_x = tf.placeholder(tf.float32, [None, timestep_size, aqi_dim*num_stations])
+weather_pre = tf.placeholder(tf.float32, [None, hop,num_stations, atm_dim])
 train = tf.placeholder(tf.float32)
 # reshape
 
 # atm_x = tf.placeholder(tf.float32, [None, num_stations*atm_dim])
 # aqi_x = tf.placeholder(tf.float32, [None, num_stations*aqi_dim])
 
+flatten_wth = tf.reshape(weather_pre,[-1,hop*num_stations*atm_dim])
 atm_out = LSTM(inputs=atm_x,
                hidden_size=128,
                layer_num=3,
@@ -186,7 +191,7 @@ atm_out = LSTM(inputs=atm_x,
                keep_prob=train,
                scope='ATM')
 
-aqi_out = LSTM(inputs=atm_x,
+aqi_out = LSTM(inputs=aqi_x,
                hidden_size=128,
                layer_num=3,
                batch_size=16,
@@ -195,14 +200,15 @@ aqi_out = LSTM(inputs=atm_x,
 
 con = tf.concat([atm_out, aqi_out], 1)
 
-to_weather = Affine(con, 128, atm_dim)
+to_weather = Affine(con, 256, atm_dim*num_stations*hop)
 
 keep_prob = tf.placeholder(tf.float32)
 
 
-cross_entropy = -tf.reduce_mean(weather_pre * tf.log(to_weather))
+cross_entropy = -tf.reduce_mean(flatten_wth * tf.log(to_weather))
 train_weather = tf.train.AdamOptimizer(lr).minimize(cross_entropy)
-wth_loss = tf.reduce_mean(tf.abs(to_weather-wth_pre), 0)
+
+wth_loss = tf.reduce_mean(tf.abs(flatten_wth-to_weather), 1)
 
 
 
@@ -223,31 +229,35 @@ count_all = 0
 for j in range(20):
     count = 0
     for i in range(phase_1):
-        batch = random.randint(100, 416)
+        batch = random.randint(100, 400)
         sess.run(train_weather,
-                 feed_dict={atm_x: atm_data[batch],
-                            aqi_x: aqi_data[batch],
-                            weather_pre: wth_pre[batch],
+                 feed_dict={atm_x: atm_data[batch:batch+16],
+                            aqi_x: aqi_data[batch:batch+16],
+                            weather_pre: wth_pre[batch:batch+16],
                             train: 0.5})
     #    print("========Iter:"+str(i)+",Accuracy:========",(acc))
         if(i%21 != 0):
-            acc = sess.run(wth_loss, feed_dict={atm_x: atm_data[99],
-                                                aqi_x: aqi_data[99],
-                                                weather_pre: wth_pre[99],
+            acc = 0
+            for i in range(6):
+                acc += sess.run(wth_loss, feed_dict={atm_x: atm_data[i*16:(i+1)*16],
+                                                aqi_x: aqi_data[i*16:(i+1)*16],
+                                                weather_pre: wth_pre[i*16:(i+1)*16],
                                                 train: 1})
-            print("     Phase1: Epoch:" + str(count) + str(acc))
-            count = count+1
+                acc = acc/6
+                print("     Phase1: Epoch:" + str(count) + str(acc))
+                count = count+1
         phase_1 -= 1
     count = 0
     for i in range(phase_2):
-        batch = random.randint(100, 416)
+        batch = random.randint(100, 400)
         sess.run(train_op,
-                 feed_dict={atm_x: atm_data[batch],
-                            aqi_x: aqi_data[batch],
-                            y: target_set[batch],
+                 feed_dict={atm_x: atm_data[batch:batch+16],
+                            aqi_x: aqi_data[batch:batch+16],
+                            y: target_set[batch:batch+16],
                             train: 0.5})
         #    print("========Iter:"+str(i)+",Accuracy:========",(acc))
         if (i % 21 != 0):
+            
             acc = sess.run(loss, feed_dict={atm_x: atm_data[99],
                                             aqi_x: aqi_data[99],
                                             y: target_set[99],
