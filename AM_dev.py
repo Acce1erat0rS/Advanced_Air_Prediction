@@ -177,7 +177,7 @@ print("WTH Data shape   :  " + str(np.shape(wth_pre)))
 sess = tf.InteractiveSession()
 batch_size = tf.placeholder(tf.int32)
 _X = tf.placeholder(tf.float32, [None, timestep_size, 36])     # TODO change this to the divided ver
-y = tf.placeholder(tf.float32, [3])
+y = tf.placeholder(tf.float32, [None,3])
 atm_x = tf.placeholder(tf.float32, [None, timestep_size, atm_dim*num_stations])
 aqi_x = tf.placeholder(tf.float32, [None, timestep_size, aqi_dim*num_stations])
 weather_pre = tf.placeholder(tf.float32, [None, hop,num_stations, atm_dim])
@@ -212,7 +212,7 @@ keep_prob = tf.placeholder(tf.float32)
 cross_entropy = -tf.reduce_mean(flatten_wth * tf.log(to_weather))
 train_weather = tf.train.AdamOptimizer(lr).minimize(cross_entropy)
 
-wth_loss = tf.reduce_mean(tf.abs(flatten_wth-to_weather), 1)
+wth_loss = tf.reduce_mean(tf.abs(flatten_wth-to_weather), 0)
 
 
 W = tf.Variable(tf.truncated_normal([256, output_parameters],
@@ -236,6 +236,7 @@ for j in range(200):
     phase_2_count = 0
     for i in range(phase_1):
     #for batch in range(100, 400):
+        batch = random.randint(100,400)
         sess.run(train_weather,
                  feed_dict={atm_x: atm_data[batch:batch+16],
                             aqi_x: aqi_data[batch:batch+16],
@@ -263,7 +264,7 @@ for j in range(200):
             phase_1_count += 1
             phase_1_acc += sess.run(loss, feed_dict={atm_x: atm_data[i * 16:(i + 1) * 16],
                                                          aqi_x: aqi_data[i * 16:(i + 1) * 16],
-                                                         weather_pre: wth_pre[i * 16:(i + 1) * 16],
+                                                         y: target_set[i * 16:(i + 1) * 16],
                                                          train: 1})
     phase_2_acc /= phase_2_count
     print("     Phase 2: Epoch" + str(j)+ " :" + str(phase_2_acc))
