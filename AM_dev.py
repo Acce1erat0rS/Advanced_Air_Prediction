@@ -228,7 +228,9 @@ loss = tf.reduce_mean(tf.abs(y_pre-y), 0)
 
 sess.run(tf.global_variables_initializer())
 
+print("Start training")
 for j in range(200):
+    print ("epoch"+ (str)(j))
     count = 0
     phase_1_acc = 0
     phase_1_count = 0
@@ -236,6 +238,7 @@ for j in range(200):
     phase_2_count = 0
     for i in range(phase_1):
     #for batch in range(100, 400):
+        print("Iter "+str(i) + "/" + str(phase_1))
         batch = random.randint(100,400)
         sess.run(train_weather,
                  feed_dict={atm_x: atm_data[batch:batch+16],
