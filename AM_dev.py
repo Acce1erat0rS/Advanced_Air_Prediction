@@ -19,8 +19,8 @@ timestep_size = 71                # Hours of looking ahead
 output_parameters = 3   # Number of predicting parameters
 num_stations = 3        # Number of monitoring stations
 
-phase_1 = 200
-phase_2 = 1
+phase_1 = 20
+phase_2 = 20
 
 
 do_phase_1 = [1,2,3,4,5,7,9,11,13,15,17,19,21,24,27,30,33,36,40,45,50,55,60]
@@ -238,7 +238,7 @@ for j in range(200):
     phase_2_count = 0
     for i in range(phase_1):
     #for batch in range(100, 400):
-        print("Iter "+str(i) + "/" + str(phase_1))
+        #print("Iter "+str(i) + "/" + str(phase_1))
         batch = random.randint(100,400)
         sess.run(train_weather,
                  feed_dict={atm_x: atm_data[batch:batch+16],
@@ -254,7 +254,8 @@ for j in range(200):
                                                 weather_pre: wth_pre[i*16:(i+1)*16],
                                                 train: 1})
     phase_1_acc /= phase_1_count
-    print("     Phase1: Epoch" + str(j)+" :" + str(phase_1_acc))
+    phase_1_res = float(sum(phase_1_acc))/len(phase_1_acc)
+    print("     Phase1: Epoch" + str(j)+" :" + str(phase_1_res))
     for i in range(phase_2):
         batch = random.randint(100, 400)
         sess.run(train_op,
@@ -264,8 +265,8 @@ for j in range(200):
                             train: 0.5})
         #    print("========Iter:"+str(i)+",Accuracy:========",(acc))
         for i in range(6):
-            phase_1_count += 1
-            phase_1_acc += sess.run(loss, feed_dict={atm_x: atm_data[i * 16:(i + 1) * 16],
+            phase_2_count += 1
+            phase_2_acc += sess.run(loss, feed_dict={atm_x: atm_data[i * 16:(i + 1) * 16],
                                                          aqi_x: aqi_data[i * 16:(i + 1) * 16],
                                                          y: target_set[i * 16:(i + 1) * 16],
                                                          train: 1})
